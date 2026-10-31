@@ -4,11 +4,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import annotate, features, read, setup
+from common import PALETTE, annotate, features, hero, read, setup, style
 from merchant_pulse import config, pipeline, registry, store
 
 setup("MLOps", "🔁")
-st.title("6 · MLOps loop")
+hero("6 · MLOps loop", "Nothing reaches the registry without passing the gate, nothing takes full traffic without a canary, and rollback is a pointer change. "
+     "Monitoring watches drift, alert volume and precision from merchant feedback, and decides when to retrain.",
+     ["Train → gate → register", "Canary → promote", "Rollback", "PSI drift", "Feedback precision", "Retrain trigger"])
 annotate("Train → gate → register → canary → promote → monitor → retrain, with rollback",
          "`registry.py` keeps versions under `registry/models/vN` (serialized ensemble + uplift model, eval report, lineage: data snapshot hash, "
          "feature and detector code hashes, thresholds, approver). **Train candidate** validates data, trains, runs the harness and the gate. "
@@ -32,6 +34,23 @@ with c1:
         st.info("Empty registry.")
 with c2:
     st.metric("Production", reg.get("production") or "none"); st.metric("Previous", reg.get("previous") or "none")
+if len(vt) and vt.f1.notna().any():
+    v1, v2 = st.columns(2)
+    with v1:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=vt.version, y=vt.f1, name="F1", marker_color=PALETTE["alert"]))
+        fig.add_trace(go.Bar(x=vt.version, y=vt.precision, name="precision", marker_color=PALETTE["actual"]))
+        fig.add_trace(go.Bar(x=vt.version, y=vt.recall, name="recall", marker_color=PALETTE["ok"]))
+        fig.add_hline(y=config.GATE["f1_min"], line=dict(color="#c9d1d9", dash="dot"), annotation_text="F1 gate", annotation_font_size=10)
+        fig.update_layout(barmode="group", yaxis=dict(range=[0, 1.1]))
+        st.plotly_chart(style(fig, 280, "Versions: detection quality on the harness"), width="stretch")
+    with v2:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=vt.version, y=vt.fa_per_1k, name="false alerts / 1k", marker_color=PALETTE["drift"]))
+        fig.add_trace(go.Scatter(x=vt.version, y=vt.sign_acc, name="recommendation sign accuracy", yaxis="y2", mode="markers+lines", line=dict(color=PALETTE["ok"])))
+        fig.add_hline(y=config.GATE["fa_per_1k_max"], line=dict(color="#c9d1d9", dash="dot"), annotation_text="FA gate", annotation_font_size=10)
+        fig.update_layout(yaxis2=dict(overlaying="y", side="right", range=[0, 1.05], showgrid=False))
+        st.plotly_chart(style(fig, 280, "Versions: false alerts and recommendation accuracy"), width="stretch")
 
 st.subheader("Actions")
 b1, b2, b3, b4, b5 = st.columns(5)
@@ -92,10 +111,22 @@ if mon is not None and len(mon):
     m3.metric("Precision from feedback (28d)", f"{fp:.2f}" if fp == fp else "no feedback yet", f"{int(last.feedback_confirmed)} confirmed / {int(last.feedback_dismissed)} dismissed")
     m4.metric("Retrain trigger", "YES" if last.retrain_trigger else "no", last.trigger_reasons or "all signals inside limits", delta_color="inverse")
     psi_cols = [c for c in mon.columns if c.startswith("psi_")]
-    fig = go.Figure(go.Bar(x=[c[4:] for c in psi_cols], y=[last[c] for c in psi_cols], marker_color=["#cf222e" if last[c] > config.PSI_RETRAIN else "#1f6feb" for c in psi_cols]))
-    fig.add_hline(y=config.PSI_RETRAIN, line=dict(color="#cf222e", dash="dot"), annotation_text=f"retrain threshold {config.PSI_RETRAIN}")
-    fig.update_layout(title="Feature drift: PSI, last 7 days vs training reference", height=280, margin=dict(l=10, r=10, t=30, b=10))
-    st.plotly_chart(fig, width="stretch")
+    p1, p2 = st.columns(2)
+    with p1:
+        fig = go.Figure(go.Bar(x=[c[4:] for c in psi_cols], y=[last[c] for c in psi_cols],
+                               marker_color=[PALETTE["price_error"] if last[c] > config.PSI_RETRAIN else PALETTE["actual"] for c in psi_cols],
+                               text=[f"{last[c]:.3f}" for c in psi_cols], textposition="outside"))
+        fig.add_hline(y=config.PSI_RETRAIN, line=dict(color=PALETTE["price_error"], dash="dot"), annotation_text=f"retrain threshold {config.PSI_RETRAIN}", annotation_font_size=10)
+        fig.add_hrect(y0=0.1, y1=config.PSI_RETRAIN, fillcolor="rgba(227,179,65,0.10)", line_width=0)
+        st.plotly_chart(style(fig, 290, "Feature drift: PSI, last 7 days vs training reference", legend=False), width="stretch")
+    with p2:
+        mon2 = mon.copy(); mon2["ts"] = pd.to_datetime(mon2.ts)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=mon2.ts, y=mon2.alert_episodes_per_1k_series_days_7d, name="alert episodes / 1k (7d)", mode="lines+markers", line=dict(color=PALETTE["alert"])))
+        fig.add_trace(go.Scatter(x=mon2.ts, y=mon2.feedback_precision, name="feedback precision", mode="lines+markers", line=dict(color=PALETTE["ok"]), yaxis="y2"))
+        fig.add_hline(y=config.GATE["fa_per_1k_max"], line=dict(color="#8b949e", dash="dot"))
+        fig.update_layout(yaxis2=dict(overlaying="y", side="right", range=[0, 1.05], showgrid=False))
+        st.plotly_chart(style(fig, 290, "Monitoring over time: alert rate and precision from feedback"), width="stretch")
     with st.expander("Monitoring snapshots"):
         st.dataframe(mon.round(3), hide_index=True, width="stretch")
     annotate("How to read the monitor",

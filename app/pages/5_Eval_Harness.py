@@ -4,11 +4,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import PALETTE, annotate, setup
+from common import PALETTE, TYPE_ORDER, annotate, hero, setup, style
 from merchant_pulse import config, registry
 
 setup("Eval Harness", "🧪")
-st.title("5 · Evaluation harness and gate")
+hero("5 · Evaluation harness and gate", "Does it find real anomalies without crying wolf, and do the recommendations move sales? "
+     "Injected labels give exact precision and recall; historical promotions give a matched-control read on lift. The gate reads both.",
+     ["Injected anomalies", "Matched-control lift", "F1 · FA/1k · TTD · sign accuracy", "Blocks promotion"])
 annotate("Two tracks, one gate",
          "**Detection quality**: take the clean holdout (last 90 days) for half the stores, inject labeled anomalies with material magnitudes "
          "(2–3 day +2× baseline spikes, 7–10 day 65% drops, 28-day −4%/day drifts, 3–10 day stockouts, 10× price errors) into series selling "
@@ -47,12 +49,34 @@ with c1:
                  hide_index=True, width="stretch")
     st.caption(f"Holdout stores: {', '.join(det['holdout_stores'])} · {det['n_series']} series · TP {det['tp']} · FP {det['fp']} · FN {det['fn']}")
 with c2:
+    by = by.set_index("anomaly_type").reindex([t for t in TYPE_ORDER if t in set(by.anomaly_type)]).reset_index()
     fig = go.Figure()
-    fig.add_trace(go.Bar(x=by.anomaly_type, y=by.recall, name="recall", marker_color=[PALETTE.get(t, "#1f6feb") for t in by.anomaly_type]))
-    fig.add_trace(go.Scatter(x=by.anomaly_type, y=by.ttd_median, name="median TTD (days)", yaxis="y2", mode="markers+lines", line=dict(color="#8b949e")))
-    fig.update_layout(height=280, margin=dict(l=10, r=10, t=30, b=10), yaxis=dict(range=[0, 1.05]), yaxis2=dict(overlaying="y", side="right"),
-                      legend=dict(orientation="h", y=-0.25), title="Recall and time to detect by type")
-    st.plotly_chart(fig, width="stretch")
+    fig.add_trace(go.Bar(x=by.anomaly_type, y=by.recall, name="recall", marker_color=[PALETTE.get(t, "#4c9aff") for t in by.anomaly_type],
+                         text=[f"{r:.0%}" for r in by.recall], textposition="outside"))
+    fig.add_trace(go.Scatter(x=by.anomaly_type, y=by.ttd_median, name="median TTD (days)", yaxis="y2", mode="markers+lines",
+                             line=dict(color="#c9d1d9"), marker=dict(size=9)))
+    fig.update_layout(yaxis=dict(range=[0, 1.15]), yaxis2=dict(overlaying="y", side="right", showgrid=False, title="days"))
+    st.plotly_chart(style(fig, 300, "Recall and time to detect by type"), width="stretch")
+e1, e2, e3 = st.columns(3)
+with e1:
+    fig = go.Figure(go.Bar(x=["precision", "recall", "F1"], y=[det["precision"], det["recall"], det["f1"]],
+                           marker_color=[PALETTE["actual"], PALETTE["ok"], PALETTE["alert"]], text=[f"{det['precision']:.2f}", f"{det['recall']:.2f}", f"{det['f1']:.2f}"], textposition="outside"))
+    fig.add_hline(y=config.GATE["f1_min"], line=dict(color="#8b949e", dash="dot"), annotation_text=f"F1 gate {config.GATE['f1_min']}", annotation_font_size=10)
+    fig.update_layout(yaxis=dict(range=[0, 1.15]))
+    st.plotly_chart(style(fig, 280, "Detection quality", legend=False), width="stretch")
+with e2:
+    lab = pd.DataFrame(det["labels"])
+    hit = lab[lab.detected]
+    fig = go.Figure(go.Histogram(x=hit.ttd_days, nbinsx=15, marker_color=PALETTE["actual"]))
+    fig.add_vline(x=config.GATE["ttd_median_max"], line=dict(color=PALETTE["alert"], dash="dot"), annotation_text="TTD gate", annotation_font_size=10)
+    fig.update_layout(xaxis_title="days to detect", yaxis_title="anomalies")
+    st.plotly_chart(style(fig, 280, "Time to detect, all detected anomalies", legend=False), width="stretch")
+with e3:
+    fig = go.Figure(go.Indicator(mode="gauge+number", value=det["fa_per_1k"], number=dict(suffix=" /1k"),
+                                 gauge=dict(axis=dict(range=[0, 10]), bar=dict(color=PALETTE["alert"] if det["fa_per_1k"] > config.GATE["fa_per_1k_max"] else PALETTE["ok"]),
+                                            steps=[dict(range=[0, config.GATE["fa_per_1k_max"]], color="rgba(63,185,80,0.15)"), dict(range=[config.GATE["fa_per_1k_max"], 10], color="rgba(255,107,107,0.15)")],
+                                            threshold=dict(line=dict(color="#c9d1d9", width=2), value=config.GATE["fa_per_1k_max"]))))
+    st.plotly_chart(style(fig, 280, "False alerts per 1k series-days (gate ≤ 5)", legend=False), width="stretch")
 with st.expander("Injected labels and outcome"):
     lab = pd.DataFrame(det["labels"]); st.dataframe(lab, hide_index=True, width="stretch", height=300)
 with st.expander(f"False episodes ({det['fp']})"):
@@ -69,14 +93,25 @@ r1.metric("Holdout promo events", rec["n_events"]); r2.metric("Sign accuracy", f
 r3.metric("MAE of lift", f"{rec['mae']:.2f}"); r4.metric("Corr. predicted vs realized", f"{rec['corr']:.2f}")
 ev = pd.DataFrame(rec["events"])
 if len(ev):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ev.predicted_lift, y=ev.realized_lift_adj, mode="markers", marker=dict(color="#1f6feb", opacity=0.6), name="event",
-                             text=ev.id, hovertemplate="%{text}<br>pred %{x:.2f} realized %{y:.2f}"))
-    lim = [min(ev.predicted_lift.min(), ev.realized_lift_adj.min()) - 0.1, max(ev.predicted_lift.max(), ev.realized_lift_adj.max()) + 0.1]
-    fig.add_trace(go.Scatter(x=lim, y=lim, mode="lines", line=dict(color="#8b949e", dash="dash"), name="y = x"))
-    fig.update_layout(height=340, margin=dict(l=10, r=10, t=30, b=10), xaxis_title="predicted lift (uplift model)", yaxis_title="realized lift net of matched control",
-                      title="Each holdout promotion: predicted vs realized")
-    st.plotly_chart(fig, width="stretch")
+    s1, s2 = st.columns([3, 2])
+    with s1:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=ev.predicted_lift, y=ev.realized_lift_adj, mode="markers",
+                                 marker=dict(color=ev.price_cut_pct, colorscale=[[0, PALETTE["alert"]], [1, PALETTE["actual"]]], opacity=0.75, size=8,
+                                             colorbar=dict(title="price cut %", thickness=10)), name="promo event",
+                                 text=ev.id, hovertemplate="%{text}<br>pred %{x:.2f} realized %{y:.2f}"))
+        lim = [min(ev.predicted_lift.min(), ev.realized_lift_adj.min()) - 0.1, max(ev.predicted_lift.max(), ev.realized_lift_adj.max()) + 0.1]
+        fig.add_trace(go.Scatter(x=lim, y=lim, mode="lines", line=dict(color="#8b949e", dash="dash"), name="y = x"))
+        fig.update_layout(xaxis_title="predicted lift (uplift model)", yaxis_title="realized lift net of matched control")
+        st.plotly_chart(style(fig, 360, "Each holdout promotion: predicted vs realized"), width="stretch")
+    with s2:
+        ev["cut_bin"] = pd.cut(-ev.price_cut_pct, bins=[0, 12, 18, 24, 35], labels=["10–12%", "12–18%", "18–24%", "24–30%"])
+        bb = ev.groupby("cut_bin", observed=True).agg(pred=("predicted_lift", "mean"), real=("realized_lift_adj", "mean"), n=("id", "size")).reset_index()
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=bb.cut_bin.astype(str), y=bb.real * 100, name="realized lift %", marker_color=PALETTE["actual"]))
+        fig.add_trace(go.Bar(x=bb.cut_bin.astype(str), y=bb.pred * 100, name="predicted lift %", marker_color=PALETTE["alert"]))
+        fig.update_layout(barmode="group", xaxis_title="price cut", yaxis_title="% units lift")
+        st.plotly_chart(style(fig, 360, "Lift by depth of price cut"), width="stretch")
     if "corr_with_true_elasticity" in rec and rec["corr_with_true_elasticity"] == rec["corr_with_true_elasticity"]:
         st.caption(f"Because the data is synthetic, the generator's true elasticity is known: correlation of predicted lift with the elasticity-implied lift = {rec['corr_with_true_elasticity']:.2f}. "
                    "This column does not exist with real data and is shown only as a check.")

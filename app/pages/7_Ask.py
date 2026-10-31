@@ -4,11 +4,12 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from common import annotate, setup
+from common import annotate, hero, setup
 from merchant_pulse import text2sql
 
 setup("Ask", "💬")
-st.title("7 · Ask the warehouse")
+hero("7 · Ask the warehouse", "Plain-English questions over the same tables the models read. Every statement passes a read-only guard before it runs.",
+     ["Pattern grammar", "Optional Gemini", "Read-only SQL", "DuckDB ↔ BigQuery"])
 annotate("Natural language → SQL",
          "A pattern grammar covers the questions merchants actually ask (top stores, sales of an item, alerts by type, stockouts). Anything that "
          "already looks like SQL runs as-is. Every statement passes a read-only guard. With `GEMINI_API_KEY` set, unmatched questions go to Gemini with "

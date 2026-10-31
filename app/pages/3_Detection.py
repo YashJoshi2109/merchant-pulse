@@ -2,10 +2,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import PALETTE, alerts, annotate, dates, features, models, read, series_chart, setup
+from common import PALETTE, TYPE_ORDER, alerts, annotate, dates, features, hero, models, read, series_chart, setup, style
 
 setup("Detection", "🎯")
-st.title("3 · Detection ensemble")
+hero("3 · Detection ensemble", "Three detectors with different blind spots vote on every series-day. Thresholds are calibrated to a false-alert budget; "
+     "episodes are reconciled up the hierarchy so a merchant gets one alert per cause.",
+     ["Residual · NB tails · frozen-origin", "Isolation Forest", "Autoencoder", "2-of-3 vote", "Effect-size + volume floors"])
 annotate("Three detectors, one vote",
          "**Residual** (`ResidualDetector`): robust Holt-Winters in log space with holiday, SNAP, price-elasticity and yearly regressors; "
          "the 1-day test is an exact negative-binomial tail, the 3/7/14/28-day tests are frozen-origin cumulative shortfalls (forecast made before the "
@@ -56,17 +58,32 @@ if len(items):
                     "units_actual", "units_expected", "revenue_at_risk", "status"]]
                  .assign(start=lambda x: x.start.dt.date, end=lambda x: x.end.dt.date).round(2).sort_values("revenue_at_risk", ascending=False),
                  hide_index=True, width="stretch", height=320)
-    cc1, cc2 = st.columns(2)
+    cc1, cc2, cc3 = st.columns(3)
     with cc1:
-        fig = go.Figure(go.Bar(x=v.anomaly_type.value_counts().index, y=v.anomaly_type.value_counts().values,
-                               marker_color=[PALETTE.get(t, "#1f6feb") for t in v.anomaly_type.value_counts().index]))
-        fig.update_layout(title="Episodes by type", height=260, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig, width="stretch")
+        vc = v.anomaly_type.value_counts().reindex(TYPE_ORDER).dropna()
+        fig = go.Figure(go.Bar(x=vc.index, y=vc.values, marker_color=[PALETTE.get(t, "#4c9aff") for t in vc.index], text=vc.values, textposition="outside"))
+        st.plotly_chart(style(fig, 270, "Episodes by type", legend=False), width="stretch")
     with cc2:
         det = v.detectors.str.split(",").explode().value_counts()
-        fig = go.Figure(go.Bar(x=det.index, y=det.values, marker_color="#8b949e"))
-        fig.update_layout(title="Which detectors voted", height=260, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig, width="stretch")
+        fig = go.Figure(go.Bar(x=det.index, y=det.values, marker_color=[PALETTE["actual"], PALETTE["drift"], PALETTE["alert"], PALETTE["ok"]][: len(det)],
+                               text=det.values, textposition="outside"))
+        st.plotly_chart(style(fig, 270, "Which detectors voted (episodes)", legend=False), width="stretch")
+    with cc3:
+        live = sc[sc.date >= d["live_start"]]
+        flags = live[["f_resid", "f_if", "f_ae"]].astype(int)
+        names = ["residual", "iforest", "autoencoder"]
+        m = flags.T.values @ flags.values
+        fig = go.Figure(go.Heatmap(z=m, x=names, y=names, colorscale=[[0, "#1a222d"], [1, PALETTE["alert"]]], text=m, texttemplate="%{text}", showscale=False))
+        st.plotly_chart(style(fig, 270, "Detector agreement: co-flagged series-days", legend=False), width="stretch")
+    tl = v.copy()
+    fig = go.Figure()
+    for t in TYPE_ORDER:
+        g = tl[tl.anomaly_type == t]
+        if len(g):
+            fig.add_trace(go.Scatter(x=g.start, y=g.store_id, mode="markers", name=t, marker=dict(color=PALETTE[t], size=(g.revenue_at_risk.clip(lower=20) ** 0.5).clip(6, 28), opacity=0.85,
+                                     line=dict(color="#0f141b", width=1)), text=[f"{r.item_id}<br>{r.start.date()} → {r.end.date()}<br>${r.revenue_at_risk:,.0f}" for _, r in g.iterrows()], hoverinfo="text"))
+    fig.update_layout(xaxis_title=None, yaxis_title=None)
+    st.plotly_chart(style(fig, 320, "Episode timeline by store (marker size = revenue at risk)"), width="stretch")
     sys_a = a[a.level != "item"]
     if len(sys_a):
         st.markdown(f"**Systemic alerts (reconciliation):** {len(sys_a)}")
@@ -88,20 +105,18 @@ s = sc[(sc.id == sid) & (sc.date >= lo)].sort_values("date")
 if len(s):
     fig = go.Figure()
     thr = ens.residual.thresholds
-    for col, name, color in [("z_1d", "residual z (1 day)", "#1f6feb"), ("z_3d", "residual z (3 day)", "#2da44e"), ("z_7d", "residual z (7 day)", "#8250df"),
-                             ("z_14d", "residual z (14 day)", "#b08800"), ("z_28d", "residual z (28 day)", "#cf222e")]:
-        fig.add_trace(go.Scatter(x=s.date, y=s[col], name=name, line=dict(color=color, width=1.3)))
+    for col, name, color in [("z_1d", "1 day (exact NB tail)", "#4c9aff"), ("z_3d", "3 day", "#3fb950"), ("z_7d", "7 day", "#b083f0"),
+                             ("z_14d", "14 day", "#e3b341"), ("z_28d", "28 day", "#ff6b6b")]:
+        fig.add_trace(go.Scatter(x=s.date, y=s[col], name=name, line=dict(color=color, width=1.4)))
     fig.add_hline(y=thr["1d"], line=dict(color="#8b949e", dash="dot")); fig.add_hline(y=-thr["1d"], line=dict(color="#8b949e", dash="dot"))
-    fig.update_layout(title="Residual detector: standardized tests at five time scales (dotted = 1-day threshold)", height=300,
-                      margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h", y=-0.2))
-    st.plotly_chart(fig, width="stretch")
+    fig.update_layout(yaxis_title="standardized z", hovermode="x unified")
+    st.plotly_chart(style(fig, 300, "Residual detector: five time scales (dotted = 1-day threshold)"), width="stretch")
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=s.date, y=s.if_score, name="isolation forest score", line=dict(color="#1f6feb")))
-    fig2.add_hline(y=ens.iforest.threshold, line=dict(color="#1f6feb", dash="dot"))
-    fig2.add_trace(go.Scatter(x=s.date, y=s.ae_score, name="autoencoder error", line=dict(color="#d9480f"), yaxis="y2"))
-    fig2.update_layout(title="Isolation Forest and autoencoder (dotted = IF threshold)", height=280, margin=dict(l=10, r=10, t=30, b=10),
-                       yaxis2=dict(overlaying="y", side="right"), legend=dict(orientation="h", y=-0.2))
-    st.plotly_chart(fig2, width="stretch")
+    fig2.add_trace(go.Scatter(x=s.date, y=s.if_score, name="isolation forest score", line=dict(color="#4c9aff")))
+    fig2.add_hline(y=ens.iforest.threshold, line=dict(color="#4c9aff", dash="dot"))
+    fig2.add_trace(go.Scatter(x=s.date, y=s.ae_score, name="autoencoder error", line=dict(color="#ff8249"), yaxis="y2"))
+    fig2.update_layout(yaxis2=dict(overlaying="y", side="right", showgrid=False), hovermode="x unified")
+    st.plotly_chart(style(fig2, 280, "Isolation Forest and autoencoder (dotted = IF threshold)"), width="stretch")
     with st.expander("Score rows"):
         st.dataframe(s[["date", "units", "yhat_units", "z_1d", "z_3d", "z_7d", "z_14d", "z_28d", "z_scale", "z_ratio", "if_score", "ae_score",
                         "f_resid", "f_if", "f_ae", "f_rule", "votes", "is_alert", "anomaly_type"]].assign(date=lambda x: x.date.dt.date).round(2),

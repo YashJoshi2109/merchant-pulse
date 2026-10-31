@@ -5,11 +5,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import annotate, dates, read, setup
+from common import annotate, dates, hero, read, setup, style
 from merchant_pulse import pipeline, registry
 
 setup("Nightly Run", "🌙")
-st.title("8 · Nightly run")
+hero("8 · Nightly run", "The whole pipeline, end to end, with per-step timings. Every step is keyed on the run date, so a retry overwrites instead of duplicating.",
+     ["Features → score → episodes", "Reconcile → attribute → prescribe → narrate", "Idempotent writes", "Monitoring snapshot"])
 annotate("What happens at 02:00",
          "`pipeline.nightly(run_date)`: load tables → build features → load production models → score the window → episodes → reconciliation → "
          "attribution + prescription + narrative → write alerts (idempotent: alerts whose peak falls in the window are replaced) → monitoring "

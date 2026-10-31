@@ -2,11 +2,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from common import annotate, dates, features, setup
+from common import annotate, dates, features, hero, setup, style
 from merchant_pulse.features import FEATURE_COLS
 
 setup("Features", "🧮")
-st.title("2 · Features")
+hero("2 · Features", "One row per series-day. Every rolling statistic is shifted by a day so a feature never contains the value it is meant to judge. "
+     "All three detectors read this table and nothing else.", ["Lags · rolling z", "91-day price reference", "SNAP · events", "Zero-run length", "Drift ratio"])
 annotate("Feature table",
          "`merchant_pulse/features.py` builds one row per series-day: lags (1, 7, 28), rolling means and std shifted by one day, a log z-score "
          "against the 28-day norm, a 91-day rolling median reference price with price % change and promo flag, SNAP and event flags, weekday, "

@@ -3,11 +3,12 @@ import json
 import pandas as pd
 import streamlit as st
 
-from common import alerts, annotate, dates, features, fmt_money, parse_json, read, series_chart, setup
+from common import alerts, annotate, dates, features, fmt_money, hero, parse_json, read, series_chart, setup
 from merchant_pulse import pipeline, store
 
 setup("Alert Detail", "🧾")
-st.title("4 · Alert detail")
+hero("4 · Alert detail", "One alert the way a merchant sees it: what happened, why, what to do, what it is worth. Confirm or dismiss feeds the next training run.",
+     ["3 drivers", "1 priced action", "3-sentence note", "Feedback = labels"])
 annotate("From alert to action",
          "Each episode carries three drivers (rules first: same-day price change, SNAP day, holiday, zero-sales run; then SHAP on the Isolation "
          "Forest row), one recommended action from a catalog chosen by expected incremental revenue (a T-learner uplift model predicts the lift of a "
