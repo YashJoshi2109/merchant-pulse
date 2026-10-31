@@ -1,21 +1,13 @@
----
-title: Merchant Pulse
-emoji: 📈
-colorFrom: blue
-colorTo: red
-sdk: streamlit
-sdk_version: __SDK__
-app_file: app/Home.py
-pinned: false
-license: mit
-short_description: Sales anomaly detection + prescriptive actions, GCP-style
----
-
 # Merchant Pulse
+
+**Live demo:** https://merchant-pulse.streamlit.app (Streamlit Community Cloud) · https://merchant-pulse-8447545245.us-central1.run.app (Google Cloud Run)
 
 Sales anomaly detection and prescriptive recommendations for merchants, built as a runnable demo of a GCP-native design.
 Every component mirrors one box in the architecture (system HLD, MLOps loop, detection ensemble, eval harness, nightly run);
 the Streamlit app explains each page in two columns: what runs here, and what runs on GCP in production.
+
+Designed and built end to end by **Yash Joshi** (Senior Data Scientist · ML Engineer): synthetic data engine, detection ensemble,
+uplift model, evaluation harness, MLOps registry, Streamlit app and the Cloud Run deployment. October 2026.
 
 ## Run
 
