@@ -1,0 +1,586 @@
+<title>Merchant Pulse Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each figure is a full-width panel with a two-column talk track beneath it. */
+:root{
+  --bg:#f3f5f8; --fg:#1b2230; --muted:#5b6676; --line:#c7cdd7; --panel:#ffffff; --panel2:#e8ecf2;
+  --accent:#d9480f; --accent-soft:rgba(217,72,15,.10); --ok:#2b8a3e;
+  --display:"Archivo",system-ui,sans-serif; --sans:"Source Sans 3",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#121820; --fg:#e6eaf0; --muted:#98a3b3; --line:#2f3b4c; --panel:#1a222d; --panel2:#222d3a;
+  --accent:#ff8249; --accent-soft:rgba(255,130,73,.14); --ok:#58c27d; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#121820; --fg:#e6eaf0; --muted:#98a3b3; --line:#2f3b4c; --panel:#1a222d; --panel2:#222d3a;
+  --accent:#ff8249; --accent-soft:rgba(255,130,73,.14); --ok:#58c27d; color-scheme:dark }
+
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1140px;margin:0 auto}
+header{padding:40px 0 24px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.1;margin:8px 0 10px;text-wrap:balance}
+.lede{max-width:68ch;color:var(--muted);margin:0}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:18px;font-family:var(--mono);font-size:13px}
+nav.toc a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--accent);outline:none}
+
+section{padding-top:40px}
+h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px;max-width:70ch}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.scroll{overflow-x:auto}
+.scroll svg{min-width:720px}
+figcaption{font-size:14px;color:var(--muted);margin-top:10px;max-width:80ch}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px}
+.legend span::before{content:"";display:inline-block;width:22px;height:0;border-top:2px solid currentColor;vertical-align:middle;margin-right:8px}
+.legend .dsh::before{border-top-style:dashed}
+.legend .acc{color:var(--accent)}
+
+.talk{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+.talk>div{min-width:0}
+.talk h3{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:500}
+.talk p,.talk li{margin:0 0 8px;font-size:15.5px}
+.talk ul{padding-left:18px;margin:0}
+.talk li b{font-weight:600}
+@media (max-width:720px){.talk{grid-template-columns:1fr}}
+
+.pitch{background:var(--panel2);border-left:3px solid var(--accent);padding:14px 18px;border-radius:0 6px 6px 0;margin-top:20px;max-width:78ch}
+.pitch p{margin:0;font-size:16.5px}
+
+table{border-collapse:collapse;width:100%;font-size:15px;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.tscroll{overflow-x:auto}
+
+.qa{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:16px}
+.qa div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.qa b{display:block;font-family:var(--display);font-weight:600;font-size:15px;margin-bottom:6px}
+.qa p{margin:0;font-size:15px;color:var(--fg)}
+
+/* diagrams */
+.d{font-family:var(--mono);color:var(--fg);max-width:100%;height:auto;display:block}
+.d .box{fill:var(--panel);stroke:currentColor;stroke-width:1.2}
+.d .soft{fill:var(--panel2)}
+.d .dash{stroke-dasharray:5 4}
+.d .accb{stroke:var(--accent);stroke-width:1.8;fill:var(--accent-soft)}
+.d .bound{fill:none;stroke:var(--muted);stroke-dasharray:6 4;stroke-width:1}
+.d .t{font-family:var(--sans);font-size:12.5px;font-weight:600;fill:currentColor}
+.d .s{font-size:10.5px;fill:var(--muted)}
+.d .hdr{font-size:10.5px;letter-spacing:.12em;fill:var(--muted)}
+.d .ln{fill:none;stroke:currentColor;stroke-width:1.3}
+.d .ln.acc{stroke:var(--accent)}
+.d .lbl{font-size:10.5px;fill:var(--muted)}
+.d .lbl.acc{fill:var(--accent)}
+.d .dia{fill:var(--panel2);stroke:currentColor;stroke-width:1.2}
+.d .dot{fill:var(--panel);stroke:currentColor;stroke-width:1.5}
+.d .mk{fill:currentColor}
+.d .mk.acc{fill:var(--accent)}
+@media (prefers-reduced-motion:no-preference){ nav.toc a{transition:border-color .15s} }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Merchant Pulse · GCP-native sales anomaly detection</div>
+  <h1>Merchant Pulse Architecture</h1>
+  <p class="lede">High-level design, MLOps loop, detection ensemble, evaluation harness and the nightly run, drawn to walk a recruiter or hiring manager through on a call. Trained on the public M5 Walmart dataset: 3,049 items, 10 stores, 3 states, 5 years of daily unit sales with prices, SNAP days and holiday events.</p>
+  <nav class="toc">
+    <a href="#hld">1 · System design</a>
+    <a href="#mlops">2 · MLOps loop</a>
+    <a href="#ensemble">3 · Detection ensemble</a>
+    <a href="#eval">4 · Eval harness</a>
+    <a href="#nightly">5 · Nightly run</a>
+    <a href="#slo">SLOs</a>
+    <a href="#qa">Likely questions</a>
+  </nav>
+  <div class="pitch"><p><b>60-second version.</b> Sales events stream through Pub/Sub and Dataflow into BigQuery. Dataform builds per-series features nightly. Three detectors vote on each series-day, a hierarchical pass decides whether a store-level anomaly is explained by its items, SHAP plus rules name the top three drivers, an uplift model picks the action with the highest expected lift, and Gemini on Vertex AI writes the three-sentence merchant note. Every model goes through an eval gate on injected anomalies before Vertex AI Model Registry will promote it, canaries on Cloud Run, and rolls back in under five minutes. Merchant confirm/dismiss clicks feed back as labels.</p></div>
+</header>
+
+<!-- ============ 1. SYSTEM HLD ============ -->
+<section id="hld">
+  <h2>1 · System design</h2>
+  <p class="sub">Left to right: where sales data enters, where it rests, what reasons over it, and who acts on the result. The dashed boundary is one GCP project.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="d" viewBox="0 0 1250 570" role="img" aria-label="End-to-end data flow: POS, calendar and inventory sources enter GCP through Pub/Sub, Dataflow and scheduled BigQuery SQL, land in BigQuery raw and feature tables, pass through a detection ensemble, hierarchical reconciliation, attribution and a prescriptive plus narrative layer, and are served through an alerts table, Cloud Run API and Looker Studio to a merchant whose confirm or dismiss feedback flows back as labels.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        <marker id="a1c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk acc"/></marker>
+      </defs>
+      <rect class="bound" x="236" y="46" width="1000" height="404" rx="10"/>
+      <text class="hdr" x="250" y="64">GCP PROJECT · US-CENTRAL1</text>
+      <text class="hdr" x="110" y="84" text-anchor="middle">SOURCES</text>
+      <text class="hdr" x="340" y="84" text-anchor="middle">INGESTION</text>
+      <text class="hdr" x="570" y="84" text-anchor="middle">STORAGE</text>
+      <text class="hdr" x="815" y="84" text-anchor="middle">INTELLIGENCE</text>
+      <text class="hdr" x="1090" y="84" text-anchor="middle">SERVING</text>
+
+      <!-- Sources -->
+      <rect class="box" x="20" y="100" width="180" height="60" rx="6"/>
+      <text class="t" x="32" y="122">POS / sales feed (M5)</text>
+      <text class="s" x="32" y="139">store × item × day</text>
+      <text class="s" x="32" y="152">replayed as events</text>
+      <rect class="box" x="20" y="200" width="180" height="60" rx="6"/>
+      <text class="t" x="32" y="222">Calendar &amp; prices</text>
+      <text class="s" x="32" y="239">promo, SNAP, holidays</text>
+      <text class="s" x="32" y="252">sell_prices weekly</text>
+      <rect class="box" x="20" y="300" width="180" height="60" rx="6"/>
+      <text class="t" x="32" y="322">Inventory snapshots</text>
+      <text class="s" x="32" y="339">on-hand, stockout flags</text>
+
+      <!-- Ingestion -->
+      <rect class="box" x="250" y="100" width="180" height="56" rx="6"/>
+      <text class="t" x="262" y="122">Pub/Sub</text>
+      <text class="s" x="262" y="139">topic: sales-events</text>
+      <rect class="box" x="250" y="186" width="180" height="56" rx="6"/>
+      <text class="t" x="262" y="208">Dataflow (Beam)</text>
+      <text class="s" x="262" y="224">streaming, dedupe,</text>
+      <text class="s" x="262" y="237">late-data windows</text>
+      <rect class="box" x="250" y="300" width="180" height="60" rx="6"/>
+      <text class="t" x="262" y="322">Scheduler + BQ SQL</text>
+      <text class="s" x="262" y="339">daily batch backfill</text>
+      <text class="s" x="262" y="352">MERGE into raw</text>
+
+      <!-- Storage -->
+      <rect class="box" x="480" y="100" width="180" height="50" rx="6"/>
+      <text class="t" x="492" y="121">BigQuery raw</text>
+      <text class="s" x="492" y="138">partitioned by date</text>
+      <rect class="box" x="480" y="170" width="180" height="64" rx="6"/>
+      <text class="t" x="492" y="192">BigQuery features</text>
+      <text class="s" x="492" y="209">lags, rolling z, price Δ</text>
+      <text class="s" x="492" y="222">event flags (Dataform)</text>
+
+      <!-- Intelligence -->
+      <rect class="box dash" x="710" y="100" width="210" height="44" rx="6"/>
+      <text class="t" x="722" y="118">Vertex AI Model Registry</text>
+      <text class="s" x="722" y="134">approved versions</text>
+      <rect class="box soft" x="710" y="170" width="210" height="64" rx="6"/>
+      <text class="t" x="722" y="192">Detection ensemble</text>
+      <text class="s" x="722" y="209">Prophet · IsoForest · LSTM-AE</text>
+      <text class="s" x="722" y="222">vote ≥ 2 of 3</text>
+      <rect class="box" x="710" y="256" width="210" height="44" rx="6"/>
+      <text class="t" x="722" y="274">Hierarchical reconciliation</text>
+      <text class="s" x="722" y="290">item → category → store</text>
+      <rect class="box" x="710" y="318" width="210" height="44" rx="6"/>
+      <text class="t" x="722" y="336">Attribution</text>
+      <text class="s" x="722" y="352">SHAP top-3 + rule layer</text>
+      <rect class="box" x="710" y="380" width="210" height="50" rx="6"/>
+      <text class="t" x="722" y="400">Prescriptive + narrative</text>
+      <text class="s" x="722" y="415">uplift model (EconML)</text>
+      <text class="s" x="722" y="427">Gemini: note + Text2SQL</text>
+
+      <!-- Serving -->
+      <rect class="box accb" x="970" y="170" width="240" height="56" rx="6"/>
+      <text class="t" x="982" y="192">Alerts table (BigQuery)</text>
+      <text class="s" x="982" y="208">series · type · severity ·</text>
+      <text class="s" x="982" y="221">drivers · action · confidence</text>
+      <rect class="box" x="970" y="250" width="240" height="56" rx="6"/>
+      <text class="t" x="982" y="272">Cloud Run API (FastAPI)</text>
+      <text class="s" x="982" y="289">/alerts  /explain  /ask</text>
+      <rect class="box" x="970" y="330" width="240" height="56" rx="6"/>
+      <text class="t" x="982" y="352">Looker Studio</text>
+      <text class="s" x="982" y="369">alerts by store / category / day</text>
+      <rect class="box" x="970" y="470" width="240" height="56" rx="6"/>
+      <text class="t" x="982" y="492">Merchant / category manager</text>
+      <text class="s" x="982" y="509">reads note, confirms or dismisses</text>
+
+      <!-- Arrows -->
+      <path class="ln" d="M200 130 H250" marker-end="url(#a1)"/>
+      <text class="lbl" x="225" y="122" text-anchor="middle">events</text>
+      <path class="ln" d="M200 230 H224 V312 H250" marker-end="url(#a1)"/>
+      <text class="lbl" x="218" y="275" text-anchor="end">daily</text>
+      <path class="ln" d="M200 330 H250" marker-end="url(#a1)"/>
+      <path class="ln" d="M340 156 V186" marker-end="url(#a1)"/>
+      <text class="lbl" x="346" y="176">pull</text>
+      <path class="ln" d="M430 214 H448 V125 H480" marker-end="url(#a1)"/>
+      <text class="lbl" x="452" y="165">stream</text>
+      <path class="ln" d="M430 330 H464 V140 H480" marker-end="url(#a1)"/>
+      <text class="lbl" x="468" y="262">MERGE daily</text>
+      <path class="ln" d="M570 150 V170" marker-end="url(#a1)"/>
+      <path class="ln" d="M660 202 H710" marker-end="url(#a1)"/>
+      <text class="lbl" x="685" y="195" text-anchor="middle">features</text>
+      <path class="ln dash" d="M815 144 V170" marker-end="url(#a1)"/>
+      <text class="lbl" x="821" y="162">promoted</text>
+      <path class="ln" d="M815 234 V256" marker-end="url(#a1)"/>
+      <path class="ln" d="M815 300 V318" marker-end="url(#a1)"/>
+      <path class="ln" d="M815 362 V380" marker-end="url(#a1)"/>
+      <path class="ln acc" d="M920 405 H945 V198 H970" marker-end="url(#a1c)"/>
+      <text class="lbl acc" x="941" y="374" text-anchor="end">alert + note</text>
+      <path class="ln" d="M1090 226 V250" marker-end="url(#a1)"/>
+      <text class="lbl" x="1096" y="243">serves</text>
+      <path class="ln" d="M1210 198 H1228 V358 H1210" marker-end="url(#a1)"/>
+      <path class="ln" d="M970 278 H958 V498 H970" marker-end="url(#a1)"/>
+      <path class="ln" d="M1090 386 V470" marker-end="url(#a1)"/>
+      <text class="lbl" x="1096" y="432">digest</text>
+      <path class="ln acc dash" d="M1090 526 V542 H570 V234" marker-end="url(#a1c)"/>
+      <text class="lbl acc" x="830" y="536" text-anchor="middle">labels: confirmed / dismissed → next training run</text>
+    </svg>
+    </div>
+    <div class="legend"><span>data flow</span><span class="dsh">control / feedback</span><span class="acc">alert path</span></div>
+    <figcaption>One GCP project. Streaming and batch both land in the same BigQuery raw table; everything downstream reads features, never raw. The only hand-off to a human is the alerts table, and the human's click comes back as a training label.</figcaption>
+  </figure>
+  <div class="talk">
+    <div><h3>Say this</h3>
+      <p>"Two ingestion paths, one landing zone. Point-of-sale events stream through Pub/Sub and Dataflow so an intraday spike is visible within minutes. Prices, promos and inventory arrive daily through a scheduled BigQuery MERGE. Both write to one partitioned raw table."</p>
+      <p>"Dataform builds the feature table: lags, rolling z-scores, price deltas, SNAP and holiday flags. Every model reads that table, so a feature bug is fixed in one place."</p>
+      <p>"The intelligence column is a chain: detect, reconcile up the hierarchy, attribute drivers, recommend an action, write the note. The output is one alert row a merchant can act on, not a score."</p>
+      <p>"The orange loop at the bottom is the part most teams skip. Confirm or dismiss on an alert becomes a label for the next training run."</p>
+    </div>
+    <div><h3>If he asks</h3>
+      <ul>
+        <li><b>Why BigQuery and not a time-series DB?</b> Merchants and analysts already query in SQL. Daily cadence fits partitioned tables. Streaming insert covers the intraday case.</li>
+        <li><b>Why Dataflow if the model runs nightly?</b> Dedupe, late-arriving data and exactly-once semantics are solved once at ingest. Scoring cadence can change without touching ingestion.</li>
+        <li><b>What does the merchant actually see?</b> Store, item or category, anomaly type, severity, three drivers, one recommended action, confidence, and a three-sentence note. Plus an "ask" box that runs Text2SQL over the same tables.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. MLOPS ============ -->
+<section id="mlops">
+  <h2>2 · MLOps loop</h2>
+  <p class="sub">Clockwise: code enters at the top left, a trained candidate must pass an eval gate to be registered, deploys through a canary, is monitored in production, and the monitor decides when to retrain. The orange dashed path is the rollback.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="d" viewBox="0 0 1280 490" role="img" aria-label="MLOps loop: GitHub to Cloud Build to a Vertex AI pipeline that validates data, trains, runs the eval harness and gates on F1, false-alert rate and time to detect; passing models register in Model Registry, deploy to a Cloud Run canary, roll out fully, are monitored for drift and precision, and a retrain trigger loops back to the pipeline. A dashed orange rollback path runs from monitoring back to the registry.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        <marker id="a2c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk acc"/></marker>
+      </defs>
+      <rect class="bound" x="400" y="70" width="860" height="130" rx="10"/>
+      <text class="hdr" x="412" y="90">VERTEX AI PIPELINES · SCHEDULED OR TRIGGERED</text>
+
+      <rect class="box" x="20" y="110" width="150" height="64" rx="6"/>
+      <text class="t" x="32" y="134">GitHub</text>
+      <text class="s" x="32" y="151">PR: tests + lint</text>
+      <rect class="box" x="200" y="110" width="170" height="64" rx="6"/>
+      <text class="t" x="212" y="134">Cloud Build</text>
+      <text class="s" x="212" y="151">build, test, submit</text>
+      <rect class="box" x="420" y="110" width="170" height="64" rx="6"/>
+      <text class="t" x="432" y="134">Validate data</text>
+      <text class="s" x="432" y="151">schema, nulls, volume</text>
+      <rect class="box soft" x="620" y="110" width="170" height="64" rx="6"/>
+      <text class="t" x="632" y="134">Train</text>
+      <text class="s" x="632" y="151">Prophet, IF, AE, uplift</text>
+      <rect class="box soft" x="820" y="110" width="170" height="64" rx="6"/>
+      <text class="t" x="832" y="134">Eval harness</text>
+      <text class="s" x="832" y="151">injected anomalies</text>
+      <polygon class="dia" points="1160,102 1230,142 1160,182 1090,142"/>
+      <text class="t" x="1160" y="146" text-anchor="middle">gate</text>
+      <text class="lbl" x="1080" y="222" text-anchor="end">F1 ≥ 0.85 · FA ≤ 5 / 1k series-days · TTD ≤ 2 d</text>
+
+      <path class="ln" d="M170 142 H200" marker-end="url(#a2)"/>
+      <path class="ln" d="M370 142 H420" marker-end="url(#a2)"/>
+      <path class="ln" d="M590 142 H620" marker-end="url(#a2)"/>
+      <path class="ln" d="M790 142 H820" marker-end="url(#a2)"/>
+      <path class="ln" d="M990 142 H1090" marker-end="url(#a2)"/>
+      <path class="ln dash" d="M1160 102 V60" marker-end="url(#a2)"/>
+      <text class="lbl" x="1160" y="50" text-anchor="middle">fail: block promotion, notify</text>
+      <path class="ln" d="M1160 182 V330" marker-end="url(#a2)"/>
+      <text class="lbl" x="1170" y="262">pass: register v+1</text>
+
+      <rect class="box" x="1060" y="330" width="200" height="64" rx="6"/>
+      <text class="t" x="1072" y="354">Model Registry</text>
+      <text class="s" x="1072" y="371">versions, lineage, approval</text>
+      <rect class="box" x="820" y="330" width="190" height="64" rx="6"/>
+      <text class="t" x="832" y="354">Cloud Run canary</text>
+      <text class="s" x="832" y="371">10% traffic · 48 h shadow</text>
+      <rect class="box" x="580" y="330" width="190" height="64" rx="6"/>
+      <text class="t" x="592" y="354">Full rollout</text>
+      <text class="s" x="592" y="371">100% · SLO p95 &lt; 300 ms</text>
+      <rect class="box soft" x="340" y="330" width="190" height="64" rx="6"/>
+      <text class="t" x="352" y="354">Model Monitoring</text>
+      <text class="s" x="352" y="371">drift · precision · volume</text>
+      <rect class="box" x="100" y="330" width="190" height="64" rx="6"/>
+      <text class="t" x="112" y="354">Retrain trigger</text>
+      <text class="s" x="112" y="371">drift &gt; τ or weekly</text>
+
+      <path class="ln" d="M1060 362 H1010" marker-end="url(#a2)"/>
+      <text class="lbl" x="1035" y="354" text-anchor="middle">deploy</text>
+      <path class="ln" d="M820 362 H770" marker-end="url(#a2)"/>
+      <text class="lbl" x="795" y="354" text-anchor="middle">promote</text>
+      <path class="ln" d="M580 362 H530" marker-end="url(#a2)"/>
+      <text class="lbl" x="555" y="354" text-anchor="middle">live</text>
+      <path class="ln" d="M340 362 H290" marker-end="url(#a2)"/>
+      <text class="lbl" x="315" y="354" text-anchor="middle">signal</text>
+      <path class="ln" d="M195 330 V250 H505 V174" marker-end="url(#a2)"/>
+      <text class="lbl" x="350" y="243" text-anchor="middle">weekly or on drift</text>
+      <path class="ln acc dash" d="M435 394 V455 H1160 V394" marker-end="url(#a2c)"/>
+      <text class="lbl acc" x="800" y="472" text-anchor="middle">rollback: re-point traffic to previous registered version, under 5 min</text>
+    </svg>
+    </div>
+    <div class="legend"><span>promotion path</span><span class="dsh">control</span><span class="acc dsh">rollback</span></div>
+    <figcaption>Nothing reaches the registry without passing the gate, and nothing takes full traffic without a 48-hour canary. Rollback is a traffic re-point to the previous registered version, not a redeploy.</figcaption>
+  </figure>
+  <div class="talk">
+    <div><h3>Say this</h3>
+      <p>"Code goes through Cloud Build, which compiles and submits the Vertex AI pipeline. The pipeline validates the data first. If yesterday's volume is off by more than two sigma from the 28-day mean, it stops before training on bad data."</p>
+      <p>"The gate is the key control. The eval harness injects labeled anomalies into a holdout and the candidate has to beat an F1 of 0.85, stay under five false alerts per thousand series-days, and detect within two days. Fail means no registry entry and a notification."</p>
+      <p>"Canary is 10% of traffic for 48 hours in shadow mode, scored side by side with the current version. Then full rollout with a latency SLO."</p>
+      <p>"Monitoring watches three things: feature drift, alert volume per store, and precision computed from merchant confirm/dismiss. Any of them crossing a threshold triggers retraining or, if it is sudden, a rollback."</p>
+    </div>
+    <div><h3>If he asks</h3>
+      <ul>
+        <li><b>How fast is rollback?</b> Under five minutes. Cloud Run keeps previous revisions; rollback is a traffic split change, not a rebuild.</li>
+        <li><b>How do you know precision in production without labels?</b> Merchant feedback is the label. Confirm counts as a true positive, dismiss as a false positive. Weekly sample of suppressed alerts is reviewed to estimate recall.</li>
+        <li><b>How often does it retrain?</b> Weekly on schedule, or earlier when drift on the top features crosses a threshold. Prophet models refit weekly and only predict daily, which keeps nightly compute small.</li>
+        <li><b>What is in lineage?</b> Data snapshot, feature SQL commit, hyperparameters, eval report, who approved. Every alert row carries the model version that produced it.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. ENSEMBLE ============ -->
+<section id="ensemble">
+  <h2>3 · Detection ensemble</h2>
+  <p class="sub">Why three detectors and a vote instead of one model: each detector covers a failure mode the others miss, and requiring agreement is what keeps the false-alert rate inside budget.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="d" viewBox="0 0 1060 520" role="img" aria-label="Detection ensemble: one series-day feature row fans out to three detectors, a Prophet or SARIMAX residual detector, an Isolation Forest and an LSTM autoencoder. Their scores fan into a vote requiring two of three. Candidates with fewer than two votes are suppressed and logged. Passing candidates go through hierarchical reconciliation, then attribution with SHAP and rules, and become an alert record with drivers, action and confidence.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+        <marker id="a3c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk acc"/></marker>
+      </defs>
+      <rect class="box" x="20" y="230" width="190" height="100" rx="6"/>
+      <text class="t" x="32" y="254">Series-day features</text>
+      <text class="s" x="32" y="272">units, price, promo, SNAP,</text>
+      <text class="s" x="32" y="285">holiday, lag_7/28, z, dow</text>
+      <text class="s" x="32" y="305">~30k series × 1 row/day</text>
+
+      <rect class="box" x="280" y="90" width="220" height="70" rx="6"/>
+      <text class="t" x="292" y="114">Prophet / SARIMAX residual</text>
+      <text class="s" x="292" y="131">outside 95% PI → z-score</text>
+      <text class="s" x="292" y="144">trend + seasonality</text>
+      <rect class="box" x="280" y="245" width="220" height="70" rx="6"/>
+      <text class="t" x="292" y="269">Isolation Forest</text>
+      <text class="s" x="292" y="286">multivariate outlier score</text>
+      <text class="s" x="292" y="299">price, promo, volume mix</text>
+      <rect class="box" x="280" y="400" width="220" height="70" rx="6"/>
+      <text class="t" x="292" y="424">LSTM autoencoder</text>
+      <text class="s" x="292" y="441">28-day reconstruction error</text>
+      <text class="s" x="292" y="454">shape anomalies</text>
+
+      <rect class="box soft" x="560" y="130" width="170" height="70" rx="6"/>
+      <text class="t" x="572" y="154">Vote ≥ 2 of 3</text>
+      <text class="s" x="572" y="171">thresholds tuned on</text>
+      <text class="s" x="572" y="184">holdout to FA budget</text>
+      <rect class="box dash" x="560" y="260" width="170" height="56" rx="6"/>
+      <text class="t" x="572" y="282">Suppressed (&lt; 2 votes)</text>
+      <text class="s" x="572" y="299">logged, weekly review</text>
+
+      <rect class="box" x="790" y="130" width="240" height="70" rx="6"/>
+      <text class="t" x="802" y="154">Hierarchical reconciliation</text>
+      <text class="s" x="802" y="171">item → category → store → state</text>
+      <text class="s" x="802" y="184">child-explained or systemic</text>
+      <rect class="box" x="790" y="260" width="240" height="70" rx="6"/>
+      <text class="t" x="802" y="284">Attribution</text>
+      <text class="s" x="802" y="301">SHAP top-3 + rules:</text>
+      <text class="s" x="802" y="314">price Δ, SNAP, holiday, zero run</text>
+      <rect class="box accb" x="790" y="400" width="240" height="80" rx="6"/>
+      <text class="t" x="802" y="424">Alert record</text>
+      <text class="s" x="802" y="441">series, type, severity,</text>
+      <text class="s" x="802" y="454">drivers[3], action, confidence</text>
+      <text class="s" x="802" y="467">→ prescriptive + narrative</text>
+
+      <path class="ln" d="M210 280 L280 125" marker-end="url(#a3)"/>
+      <path class="ln" d="M210 280 H280" marker-end="url(#a3)"/>
+      <path class="ln" d="M210 280 L280 435" marker-end="url(#a3)"/>
+      <path class="ln" d="M500 125 L560 165" marker-end="url(#a3)"/>
+      <path class="ln" d="M500 280 L560 165" marker-end="url(#a3)"/>
+      <path class="ln" d="M500 435 L560 165" marker-end="url(#a3)"/>
+      <path class="ln dash" d="M645 200 V260" marker-end="url(#a3)"/>
+      <text class="lbl" x="651" y="235">&lt; 2</text>
+      <path class="ln" d="M730 165 H790" marker-end="url(#a3)"/>
+      <path class="ln" d="M910 200 V260" marker-end="url(#a3)"/>
+      <path class="ln acc" d="M910 330 V400" marker-end="url(#a3c)"/>
+    </svg>
+    </div>
+    <figcaption>Each detector emits a calibrated score; the vote needs two of three. Store-level anomalies that are fully explained by their child items are collapsed into one alert; the rest are flagged as systemic.</figcaption>
+  </figure>
+  <div class="talk">
+    <div><h3>Say this</h3>
+      <p>"The residual detector catches what the forecast did not expect: a drop against trend, a holiday that did not lift. Isolation Forest catches combinations that are individually normal but jointly odd, like a price cut with no volume response. The autoencoder catches shape changes over a 28-day window, like a slow bleed."</p>
+      <p>"Each threshold is set on holdout to a false-alert budget, then the vote on top. One detector firing is logged, not alerted."</p>
+      <p>"Reconciliation stops the alert storm. If a store-level drop is fully explained by three items being out of stock, the merchant gets one alert about three items, not forty alerts."</p>
+      <p>"Attribution is SHAP on the Isolation Forest plus a rule layer for the things SHAP cannot name: same-day price change, SNAP day, holiday, or a zero-sales streak that is almost always a stockout."</p>
+    </div>
+    <div><h3>If he asks</h3>
+      <ul>
+        <li><b>Why not one model?</b> Each detector has a blind spot. Residual models miss multivariate oddities; Isolation Forest ignores time order; autoencoders are slow to react to sharp spikes. Voting trades a little recall for a lot of precision, which is what merchants need.</li>
+        <li><b>Cold start for new items?</b> Fall back to the category-level model until the item has eight weeks of history. Reconciliation already works at that level.</li>
+        <li><b>Severity?</b> Revenue at risk: anomaly magnitude × price × expected days to resolve. Alerts are ranked by it and capped per merchant per day.</li>
+        <li><b>Compute cost?</b> About 30k series. Prophet refits weekly, predicts daily. Isolation Forest and the autoencoder score in one Cloud Run job with eight parallel tasks, well under 20 minutes.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. EVAL ============ -->
+<section id="eval">
+  <h2>4 · Evaluation harness</h2>
+  <p class="sub">Two tracks. The top one answers "does it find real anomalies without crying wolf". The bottom one answers "do the recommendations actually move sales". Both feed the pipeline gate in figure 2.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="d" viewBox="0 0 1140 370" role="img" aria-label="Evaluation harness with two tracks. Detection quality: a holdout of the last 90 days and 20 percent of stores has labeled anomalies injected, spikes, drops, gradual drift, stockouts and price errors; the ensemble runs with production thresholds and is scored against the labels, producing precision, recall and F1 by type, false alerts per thousand series-days, median time to detect, alerts per store per day and prediction-interval coverage. Recommendation quality: historical promo and price events are fed to the uplift model, compared against matched controls, and realized versus predicted lift is checked.">
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <text class="hdr" x="20" y="88">DETECTION QUALITY</text>
+      <rect class="box" x="20" y="120" width="200" height="70" rx="6"/>
+      <text class="t" x="32" y="144">Holdout</text>
+      <text class="s" x="32" y="161">last 90 d, 20% of stores</text>
+      <rect class="box soft" x="270" y="100" width="220" height="110" rx="6"/>
+      <text class="t" x="282" y="122">Inject labeled anomalies</text>
+      <text class="s" x="282" y="140">spike +150%</text>
+      <text class="s" x="282" y="153">drop −60%</text>
+      <text class="s" x="282" y="166">gradual drift over 21 d</text>
+      <text class="s" x="282" y="179">stockout (zero run)</text>
+      <text class="s" x="282" y="192">price error ×10</text>
+      <rect class="box" x="540" y="120" width="170" height="70" rx="6"/>
+      <text class="t" x="552" y="144">Run ensemble</text>
+      <text class="s" x="552" y="161">prod thresholds</text>
+      <rect class="box" x="760" y="120" width="170" height="70" rx="6"/>
+      <text class="t" x="772" y="144">Score vs. labels</text>
+      <text class="s" x="772" y="161">per type, per level</text>
+      <rect class="box soft" x="980" y="60" width="140" height="190" rx="6"/>
+      <text class="t" x="992" y="84">Metrics</text>
+      <text class="s" x="992" y="104">P / R / F1 by type</text>
+      <text class="s" x="992" y="122">false alerts per</text>
+      <text class="s" x="992" y="135">1k series-days</text>
+      <text class="s" x="992" y="153">median TTD (days)</text>
+      <text class="s" x="992" y="171">alerts / store / day</text>
+      <text class="s" x="992" y="189">95% PI coverage</text>
+      <text class="s" x="992" y="202">(calibration)</text>
+      <path class="ln" d="M220 155 H270" marker-end="url(#a4)"/>
+      <path class="ln" d="M490 155 H540" marker-end="url(#a4)"/>
+      <path class="ln" d="M710 155 H760" marker-end="url(#a4)"/>
+      <path class="ln" d="M930 155 H980" marker-end="url(#a4)"/>
+
+      <text class="hdr" x="270" y="278">RECOMMENDATION QUALITY</text>
+      <rect class="box" x="270" y="290" width="220" height="60" rx="6"/>
+      <text class="t" x="282" y="312">Historical promo/price events</text>
+      <text class="s" x="282" y="329">calendar + sell_prices</text>
+      <rect class="box" x="540" y="290" width="170" height="60" rx="6"/>
+      <text class="t" x="552" y="312">Uplift model</text>
+      <text class="s" x="552" y="329">predicted lift / event</text>
+      <rect class="box" x="760" y="290" width="170" height="60" rx="6"/>
+      <text class="t" x="772" y="312">Matched control</text>
+      <text class="s" x="772" y="329">same category, no event</text>
+      <rect class="box soft" x="980" y="290" width="140" height="60" rx="6"/>
+      <text class="t" x="992" y="310">Lift check</text>
+      <text class="s" x="992" y="325">realized vs.</text>
+      <text class="s" x="992" y="338">predicted lift</text>
+      <path class="ln" d="M490 320 H540" marker-end="url(#a4)"/>
+      <path class="ln" d="M710 320 H760" marker-end="url(#a4)"/>
+      <path class="ln" d="M930 320 H980" marker-end="url(#a4)"/>
+    </svg>
+    </div>
+    <figcaption>Injected anomalies give exact labels, so precision and recall are real numbers rather than estimates. The recommendation track uses the five years of real promo and price events in M5 as a natural experiment.</figcaption>
+  </figure>
+  <div class="talk">
+    <div><h3>Say this</h3>
+      <p>"Real anomaly labels are rare, so I manufacture them. Take the last 90 days for a fifth of the stores, inject five anomaly types with known start and end, run the ensemble with production thresholds, and score it. That gives precision, recall and F1 per anomaly type, false alerts per thousand series-days, and median days to detect."</p>
+      <p>"The second track is the one that matters to a merchant. M5 has five years of real price changes and promo events. For each event, the uplift model predicts lift, I match a control series in the same category with no event, and compare realized to predicted. Sign accuracy and lift error are the metrics."</p>
+      <p>"Both reports are produced by the pipeline and attached to the model version. The gate reads them."</p>
+    </div>
+    <div><h3>If he asks</h3>
+      <ul>
+        <li><b>Aren't injected anomalies easier than real ones?</b> Yes, so they are a floor, not a ceiling. Production precision comes from merchant feedback and is tracked separately in monitoring.</li>
+        <li><b>How do you measure recall in production?</b> Weekly stratified sample of suppressed series reviewed by hand; estimated recall with a confidence interval goes into the monitoring dashboard.</li>
+        <li><b>Why matched control and not an A/B test?</b> Historical data has no randomization. Matched control is the honest offline estimate. In production, recommendations would ship with a holdout group of merchants for a true A/B read.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. NIGHTLY ============ -->
+<section id="nightly">
+  <h2>5 · Nightly run</h2>
+  <p class="sub">What happens between two and three in the morning, so a merchant opens a finished digest at eight.</p>
+  <figure>
+    <div class="scroll">
+    <svg class="d" viewBox="0 0 1100 170" role="img" aria-label="Nightly timeline: 02:00 Cloud Scheduler fires the pipeline and batch job, 02:05 Dataform builds features in BigQuery, 02:20 a Cloud Run job scores about 30 thousand series in eight parallel tasks, 02:35 attribution and uplift write to the alerts table, 02:40 Gemini writes merchant notes, 03:00 Looker refreshes and the digest is emailed.">
+      <defs>
+        <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
+      </defs>
+      <path class="ln" d="M40 85 H1060" marker-end="url(#a5)"/>
+      <circle class="dot" cx="80" cy="85" r="6"/>
+      <circle class="dot" cx="260" cy="85" r="6"/>
+      <circle class="dot" cx="440" cy="85" r="6"/>
+      <circle class="dot" cx="620" cy="85" r="6"/>
+      <circle class="dot" cx="800" cy="85" r="6"/>
+      <circle class="dot" cx="980" cy="85" r="6"/>
+      <text class="t" x="80" y="48" text-anchor="middle">02:00</text>
+      <text class="s" x="80" y="64" text-anchor="middle">Cloud Scheduler fires</text>
+      <text class="s" x="80" y="77" text-anchor="middle">pipeline + batch job</text>
+      <text class="t" x="260" y="112" text-anchor="middle">02:05</text>
+      <text class="s" x="260" y="128" text-anchor="middle">Dataform builds features</text>
+      <text class="s" x="260" y="141" text-anchor="middle">in BigQuery</text>
+      <text class="t" x="440" y="48" text-anchor="middle">02:20</text>
+      <text class="s" x="440" y="64" text-anchor="middle">Cloud Run job scores</text>
+      <text class="s" x="440" y="77" text-anchor="middle">~30k series, 8 parallel tasks</text>
+      <text class="t" x="620" y="112" text-anchor="middle">02:35</text>
+      <text class="s" x="620" y="128" text-anchor="middle">attribution + uplift</text>
+      <text class="s" x="620" y="141" text-anchor="middle">→ alerts table</text>
+      <text class="t" x="800" y="48" text-anchor="middle">02:40</text>
+      <text class="s" x="800" y="64" text-anchor="middle">Gemini writes</text>
+      <text class="s" x="800" y="77" text-anchor="middle">merchant notes</text>
+      <text class="t" x="980" y="112" text-anchor="middle">03:00</text>
+      <text class="s" x="980" y="128" text-anchor="middle">Looker refresh,</text>
+      <text class="s" x="980" y="141" text-anchor="middle">digest emailed</text>
+    </svg>
+    </div>
+    <figcaption>One hour end to end at M5 scale. Each step is idempotent on the run date, so a failed step reruns without duplicating alerts.</figcaption>
+  </figure>
+  <div class="talk">
+    <div><h3>Say this</h3>
+      <p>"The whole nightly run is an hour. Scheduler kicks it off, features build in BigQuery, a Cloud Run job scores everything in parallel, attribution and uplift write the alert rows, Gemini writes the notes, and Looker refreshes before anyone is at a desk."</p>
+      <p>"Every step is keyed on run date, so a retry overwrites instead of duplicating. If the Gemini step fails, merchants still get the alert with drivers and action; the note says 'narrative pending'."</p>
+    </div>
+    <div><h3>If he asks</h3>
+      <ul>
+        <li><b>Intraday?</b> The streaming path keeps raw current. An hourly lightweight job runs only the residual detector on the top 500 revenue series for same-day spikes.</li>
+        <li><b>Cost at this scale?</b> BigQuery stays inside the free tier, Cloud Run scales to zero, Vertex pipeline runs are a few dollars each. Under $50 a month at M5 scale on the project budget alert.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLOs ============ -->
+<section id="slo">
+  <h2>Targets and SLOs</h2>
+  <p class="sub">The numbers the gate and the monitor enforce. Say them on the call; they are what separates a demo from a system.</p>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>Metric</th><th>Target</th><th>Where enforced</th></tr></thead>
+    <tbody>
+      <tr><td>F1 on injected anomalies (all types)</td><td class="num">≥ 0.85</td><td>Pipeline gate</td></tr>
+      <tr><td>False alerts</td><td class="num">≤ 5 per 1k series-days</td><td>Pipeline gate, monitoring</td></tr>
+      <tr><td>Median time to detect</td><td class="num">≤ 2 days</td><td>Pipeline gate</td></tr>
+      <tr><td>Recommendation sign accuracy on holdout events</td><td class="num">≥ 80%</td><td>Pipeline gate</td></tr>
+      <tr><td>Production precision from merchant feedback</td><td class="num">≥ 0.75 rolling 4 wk</td><td>Monitoring, triggers retrain</td></tr>
+      <tr><td>Alerts API p95 latency</td><td class="num">&lt; 300 ms</td><td>Cloud Run SLO</td></tr>
+      <tr><td>Nightly pipeline success</td><td class="num">≥ 99%</td><td>Cloud Monitoring alert</td></tr>
+      <tr><td>Rollback time</td><td class="num">&lt; 5 min</td><td>Cloud Run traffic split</td></tr>
+      <tr><td>Alerts per merchant per day</td><td class="num">≤ 10, ranked by revenue at risk</td><td>Serving layer cap</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ QA ============ -->
+<section id="qa">
+  <h2>Likely questions, short answers</h2>
+  <div class="qa">
+    <div><b>Why GCP for this?</b><p>BigQuery is the natural home for retail-scale daily sales, Dataform keeps feature SQL versioned, Vertex AI gives pipelines, registry and monitoring in one place, Cloud Run scales to zero between nightly runs, and Gemini sits inside the same IAM boundary as the data.</p></div>
+    <div><b>How does this scale from M5 to a real marketplace?</b><p>Same code. Partition by store and date, Dataflow autoscales ingestion, scoring moves from a Cloud Run job to Vertex AI batch prediction, Prophet refits move to a weekly Dataproc job. Alert caps and reconciliation are what keep output manageable, not compute.</p></div>
+    <div><b>What would you cut first under time pressure?</b><p>The autoencoder. Residual plus Isolation Forest with a two-of-two vote gets most of the precision. The eval harness and rollback never get cut.</p></div>
+    <div><b>Where does GenAI actually add value here?</b><p>Two places only. Writing the merchant note from structured drivers so it is grounded, and Text2SQL for follow-up questions over the same tables. Detection stays classical because it has to be calibrated and cheap.</p></div>
+    <div><b>How do you handle seasonality vs. anomaly?</b><p>Prophet and SARIMAX model yearly and weekly seasonality plus holiday and SNAP regressors, so a Thanksgiving spike is expected, not anomalous. The anomaly is deviation from that expectation.</p></div>
+    <div><b>What is the first thing you would ship?</b><p>Residual detector, eval harness, alerts table, Looker view. One week. An honest precision number on day seven beats a full ensemble on day thirty.</p></div>
+  </div>
+</section>
+</div>

@@ -1,0 +1,126 @@
+{
+  "versions": [
+    {
+      "version": "v1",
+      "status": "production",
+      "created": "2026-10-30T23:19:50+00:00",
+      "notes": "bootstrap: initial model",
+      "validation": {
+        "rows": 204680,
+        "series": 280,
+        "null_units_or_price": 0,
+        "last7_volume_z_vs_28d": -1.0758238939859988,
+        "pass": true
+      },
+      "lineage": {
+        "data_snapshot": "d835dab28d90",
+        "feature_code": "dc82362088ef",
+        "detector_code": "b993a8369da1",
+        "train_end": "2025-10-03",
+        "calibration": {
+          "calib_start": "2025-08-04",
+          "train_end": "2025-10-03",
+          "rows": 8343,
+          "thresholds": {
+            "residual_by_scale": {
+              "1d": 3.277465240455425,
+              "3d": 3.39437297292106,
+              "7d": 3.173549666430501,
+              "14d": 3.3134617038632297,
+              "28d": 3.09154592166137
+            },
+            "iforest": 0.6013598504144656,
+            "autoencoder": 2.4828021363032846
+          },
+          "flag_rate": {
+            "residual": 0.008869711135083303,
+            "iforest": 0.010068320747932399,
+            "autoencoder": 0.010068320747932399,
+            "ensemble": 0.006712213831954932
+          },
+          "ensemble_fa_per_1k": 6.712213831954932
+        },
+        "uplift": {
+          "n_treated": 13145,
+          "n_control": 40000,
+          "train_end": "2025-10-03"
+        },
+        "fa_budget": 0.01,
+        "vote_min": 2
+      },
+      "gate": {
+        "pass": false,
+        "checks": [
+          {
+            "check": "F1 on injected anomalies",
+            "value": 0.6222222222222223,
+            "target": ">= 0.85",
+            "pass": false
+          },
+          {
+            "check": "False alerts per 1k series-days",
+            "value": 2.5396825396825395,
+            "target": "<= 5.0",
+            "pass": true
+          },
+          {
+            "check": "Median time to detect (days)",
+            "value": 1.0,
+            "target": "<= 2.0",
+            "pass": true
+          },
+          {
+            "check": "Recommendation sign accuracy",
+            "value": 0.9184782608695652,
+            "target": ">= 0.8",
+            "pass": true
+          }
+        ]
+      },
+      "eval_summary": {
+        "f1": 0.6222222222222223,
+        "precision": 0.4666666666666667,
+        "recall": 0.9333333333333333,
+        "fa_per_1k": 2.5396825396825395,
+        "ttd_median": 1.0,
+        "sign_accuracy": 0.9184782608695652,
+        "pi_coverage_95": 0.9740671003081136,
+        "n_labels": 30,
+        "n_events": 184
+      },
+      "train_seconds": 8.9,
+      "approved_by": "bootstrap (break-glass override: no production baseline)",
+      "registered": "2026-10-30T23:19:50+00:00",
+      "override": true,
+      "promoted": "2026-10-30T23:19:50+00:00"
+    }
+  ],
+  "production": "v1",
+  "previous": null,
+  "events": [
+    {
+      "ts": "2026-10-30T23:19:50+00:00",
+      "event": "trained",
+      "version": "v1",
+      "detail": "gate failed"
+    },
+    {
+      "ts": "2026-10-30T23:19:50+00:00",
+      "event": "promotion_blocked",
+      "version": "v1",
+      "detail": "F1 on injected anomalies=0.62 (>= 0.85)"
+    },
+    {
+      "ts": "2026-10-30T23:19:50+00:00",
+      "event": "registered_with_override",
+      "version": "v1",
+      "detail": "approved by bootstrap (break-glass override: no production baseline)"
+    },
+    {
+      "ts": "2026-10-30T23:19:50+00:00",
+      "event": "promoted",
+      "version": "v1",
+      "detail": "bootstrap: first production model (no previous version to canary against)"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+streamlit>=1.40
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.5
+scipy>=1.13
+duckdb>=1.1
+plotly>=5.24
+joblib>=1.4
+shap>=0.46
+pytest>=8
+# optional: export GEMINI_API_KEY and install google-genai to have Gemini write merchant notes and answer Text2SQL
+# google-genai>=1.0
