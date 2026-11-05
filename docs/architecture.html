@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: one reading column; each figure is a full-width panel with a two-column talk track beneath it. */
+/* Layout: one reading column; each figure is a full-width panel with a two-column explanation beneath it. */
 :root{
   --bg:#f3f5f8; --fg:#1b2230; --muted:#5b6676; --line:#c7cdd7; --panel:#ffffff; --panel2:#e8ecf2;
   --accent:#d9480f; --accent-soft:rgba(217,72,15,.10); --ok:#2b8a3e;
@@ -86,7 +86,7 @@ tr:last-child td{border-bottom:0}
 <header>
   <div class="eyebrow">Merchant Pulse · GCP-native sales anomaly detection</div>
   <h1>Merchant Pulse Architecture</h1>
-  <p class="lede">High-level design, MLOps loop, detection ensemble, evaluation harness and the nightly run, drawn to walk a recruiter or hiring manager through on a call. Trained on the public M5 Walmart dataset: 3,049 items, 10 stores, 3 states, 5 years of daily unit sales with prices, SNAP days and holiday events.</p>
+  <p class="lede">High-level design, MLOps loop, detection ensemble, evaluation harness and the nightly run. Built for M5-shaped retail data (Walmart's public M5 set: 3,049 items, 10 stores, 3 states, 5 years of daily unit sales with prices, SNAP days and holiday events). This app runs on a synthetic generator with the same shape, 280 series over two years, so every page works without a Kaggle login.</p>
   <nav class="toc">
     <a href="#hld">1 · System design</a>
     <a href="#mlops">2 · MLOps loop</a>
@@ -94,9 +94,9 @@ tr:last-child td{border-bottom:0}
     <a href="#eval">4 · Eval harness</a>
     <a href="#nightly">5 · Nightly run</a>
     <a href="#slo">SLOs</a>
-    <a href="#qa">Likely questions</a>
+    <a href="#qa">Design questions</a>
   </nav>
-  <div class="pitch"><p><b>60-second version.</b> Sales events stream through Pub/Sub and Dataflow into BigQuery. Dataform builds per-series features nightly. Three detectors vote on each series-day, a hierarchical pass decides whether a store-level anomaly is explained by its items, SHAP plus rules name the top three drivers, an uplift model picks the action with the highest expected lift, and Gemini on Vertex AI writes the three-sentence merchant note. Every model goes through an eval gate on injected anomalies before Vertex AI Model Registry will promote it, canaries on Cloud Run, and rolls back in under five minutes. Merchant confirm/dismiss clicks feed back as labels.</p></div>
+  <div class="pitch"><p><b>In short.</b> Sales events stream through Pub/Sub and Dataflow into BigQuery. Dataform builds per-series features nightly. Three detectors vote on each series-day, a hierarchical pass decides whether a store-level anomaly is explained by its items, SHAP plus rules name the top three drivers, an uplift model picks the action with the highest expected lift, and Gemini on Vertex AI writes the three-sentence merchant note. Every model goes through an eval gate on injected anomalies before Vertex AI Model Registry will promote it, canaries on Cloud Run, and rolls back in under five minutes. Merchant confirm/dismiss clicks feed back as labels.</p></div>
 </header>
 
 <!-- ============ 1. SYSTEM HLD ============ -->
@@ -223,17 +223,17 @@ tr:last-child td{border-bottom:0}
     <figcaption>One GCP project. Streaming and batch both land in the same BigQuery raw table; everything downstream reads features, never raw. The only hand-off to a human is the alerts table, and the human's click comes back as a training label.</figcaption>
   </figure>
   <div class="talk">
-    <div><h3>Say this</h3>
-      <p>"Two ingestion paths, one landing zone. Point-of-sale events stream through Pub/Sub and Dataflow so an intraday spike is visible within minutes. Prices, promos and inventory arrive daily through a scheduled BigQuery MERGE. Both write to one partitioned raw table."</p>
-      <p>"Dataform builds the feature table: lags, rolling z-scores, price deltas, SNAP and holiday flags. Every model reads that table, so a feature bug is fixed in one place."</p>
-      <p>"The intelligence column is a chain: detect, reconcile up the hierarchy, attribute drivers, recommend an action, write the note. The output is one alert row a merchant can act on, not a score."</p>
-      <p>"The orange loop at the bottom is the part most teams skip. Confirm or dismiss on an alert becomes a label for the next training run."</p>
+    <div><h3>How it works</h3>
+      <p>Two ingestion paths, one landing zone. Point-of-sale events stream through Pub/Sub and Dataflow, so an intraday spike is visible within minutes. Prices, promotions and inventory arrive daily through a scheduled BigQuery MERGE. Both write to one partitioned raw table.</p>
+      <p>Dataform builds the feature table: lags, rolling z-scores, price deltas, SNAP and holiday flags. Every model reads that table and nothing else, so a feature bug is fixed in one place.</p>
+      <p>The intelligence column is a chain: detect, reconcile up the hierarchy, attribute drivers, recommend an action, write the note. The output is one alert row a merchant can act on, not a bare score.</p>
+      <p>The orange loop at the bottom closes the system. A confirm or dismiss on an alert becomes a label for the next training run.</p>
     </div>
-    <div><h3>If he asks</h3>
+    <div><h3>Design decisions</h3>
       <ul>
-        <li><b>Why BigQuery and not a time-series DB?</b> Merchants and analysts already query in SQL. Daily cadence fits partitioned tables. Streaming insert covers the intraday case.</li>
-        <li><b>Why Dataflow if the model runs nightly?</b> Dedupe, late-arriving data and exactly-once semantics are solved once at ingest. Scoring cadence can change without touching ingestion.</li>
-        <li><b>What does the merchant actually see?</b> Store, item or category, anomaly type, severity, three drivers, one recommended action, confidence, and a three-sentence note. Plus an "ask" box that runs Text2SQL over the same tables.</li>
+        <li><b>BigQuery rather than a time-series database.</b> Merchants and analysts already query in SQL, daily cadence fits partitioned tables, and streaming insert covers the intraday case.</li>
+        <li><b>Dataflow even though scoring is nightly.</b> Deduplication, late-arriving data and exactly-once semantics are solved once at ingest. Scoring cadence can change without touching ingestion.</li>
+        <li><b>What the merchant sees.</b> Store, item or category, anomaly type, severity, three drivers, one recommended action with its confidence, and a three-sentence note, plus an "ask" box that runs Text2SQL over the same tables.</li>
       </ul>
     </div>
   </div>
@@ -316,18 +316,18 @@ tr:last-child td{border-bottom:0}
     <figcaption>Nothing reaches the registry without passing the gate, and nothing takes full traffic without a 48-hour canary. Rollback is a traffic re-point to the previous registered version, not a redeploy.</figcaption>
   </figure>
   <div class="talk">
-    <div><h3>Say this</h3>
-      <p>"Code goes through Cloud Build, which compiles and submits the Vertex AI pipeline. The pipeline validates the data first. If yesterday's volume is off by more than two sigma from the 28-day mean, it stops before training on bad data."</p>
-      <p>"The gate is the key control. The eval harness injects labeled anomalies into a holdout and the candidate has to beat an F1 of 0.85, stay under five false alerts per thousand series-days, and detect within two days. Fail means no registry entry and a notification."</p>
-      <p>"Canary is 10% of traffic for 48 hours in shadow mode, scored side by side with the current version. Then full rollout with a latency SLO."</p>
-      <p>"Monitoring watches three things: feature drift, alert volume per store, and precision computed from merchant confirm/dismiss. Any of them crossing a threshold triggers retraining or, if it is sudden, a rollback."</p>
+    <div><h3>How it works</h3>
+      <p>Code goes through Cloud Build, which compiles and submits the Vertex AI pipeline. The pipeline validates the data first: if yesterday's volume is more than two sigma from the 28-day mean, it stops before training on bad data.</p>
+      <p>The gate is the key control. The eval harness injects labeled anomalies into a holdout, and the candidate must reach an F1 of 0.85, stay under five false alerts per thousand series-days, detect within two days, and get the sign of its recommendations right at least 80% of the time. A failed gate blocks promotion unless an owner records a break-glass override, which is logged with the reason.</p>
+      <p>Canary is 10% of traffic for 48 hours in shadow mode, scored side by side with the current version, then full rollout under a latency SLO.</p>
+      <p>Monitoring watches three things: feature drift (PSI), alert volume per store, and precision computed from merchant confirm/dismiss. Any of them crossing a threshold triggers retraining or, if the change is sudden, a rollback.</p>
     </div>
-    <div><h3>If he asks</h3>
+    <div><h3>Design decisions</h3>
       <ul>
-        <li><b>How fast is rollback?</b> Under five minutes. Cloud Run keeps previous revisions; rollback is a traffic split change, not a rebuild.</li>
-        <li><b>How do you know precision in production without labels?</b> Merchant feedback is the label. Confirm counts as a true positive, dismiss as a false positive. Weekly sample of suppressed alerts is reviewed to estimate recall.</li>
-        <li><b>How often does it retrain?</b> Weekly on schedule, or earlier when drift on the top features crosses a threshold. Prophet models refit weekly and only predict daily, which keeps nightly compute small.</li>
-        <li><b>What is in lineage?</b> Data snapshot, feature SQL commit, hyperparameters, eval report, who approved. Every alert row carries the model version that produced it.</li>
+        <li><b>Rollback speed.</b> Under five minutes. Cloud Run keeps previous revisions; rollback is a traffic-split change, not a rebuild.</li>
+        <li><b>Precision without labels.</b> Merchant feedback is the label: confirm counts as a true positive, dismiss as a false positive. A weekly sample of suppressed alerts is reviewed to estimate recall.</li>
+        <li><b>Retraining cadence.</b> Weekly on schedule, or earlier when PSI on a monitored feature crosses 0.20. The forecaster refits weekly and only predicts daily, which keeps nightly compute small.</li>
+        <li><b>Lineage.</b> Data snapshot hash, feature and detector code hashes, calibration thresholds, eval report, who approved. Every alert row carries the model version that produced it.</li>
       </ul>
     </div>
   </div>
@@ -401,18 +401,18 @@ tr:last-child td{border-bottom:0}
     <figcaption>Each detector emits a calibrated score; the vote needs two of three. Store-level anomalies that are fully explained by their child items are collapsed into one alert; the rest are flagged as systemic.</figcaption>
   </figure>
   <div class="talk">
-    <div><h3>Say this</h3>
-      <p>"The residual detector catches what the forecast did not expect: a drop against trend, a holiday that did not lift. Isolation Forest catches combinations that are individually normal but jointly odd, like a price cut with no volume response. The autoencoder catches shape changes over a 28-day window, like a slow bleed."</p>
-      <p>"Each threshold is set on holdout to a false-alert budget, then the vote on top. One detector firing is logged, not alerted."</p>
-      <p>"Reconciliation stops the alert storm. If a store-level drop is fully explained by three items being out of stock, the merchant gets one alert about three items, not forty alerts."</p>
-      <p>"Attribution is SHAP on the Isolation Forest plus a rule layer for the things SHAP cannot name: same-day price change, SNAP day, holiday, or a zero-sales streak that is almost always a stockout."</p>
+    <div><h3>How it works</h3>
+      <p>The residual detector catches what the forecast did not expect: a drop against trend, a holiday that did not lift. Isolation Forest catches combinations that are individually normal but jointly odd, such as a price cut with no volume response. The autoencoder catches shape changes over a 28-day window, such as a slow bleed.</p>
+      <p>Each threshold is set on a clean calibration slice to a false-alert budget, then the vote sits on top. One detector firing is logged, not alerted; two of three, or one detector at 1.25× its threshold, becomes an alert.</p>
+      <p>Reconciliation stops the alert storm. If a store-level drop is fully explained by three items being out of stock, the merchant gets one alert about three items, not forty alerts.</p>
+      <p>Attribution is SHAP on the Isolation Forest plus a rule layer for the things SHAP cannot name: a same-day price change, a SNAP day, a holiday, or a zero-sales streak that is almost always a stockout.</p>
     </div>
-    <div><h3>If he asks</h3>
+    <div><h3>Design decisions</h3>
       <ul>
-        <li><b>Why not one model?</b> Each detector has a blind spot. Residual models miss multivariate oddities; Isolation Forest ignores time order; autoencoders are slow to react to sharp spikes. Voting trades a little recall for a lot of precision, which is what merchants need.</li>
-        <li><b>Cold start for new items?</b> Fall back to the category-level model until the item has eight weeks of history. Reconciliation already works at that level.</li>
-        <li><b>Severity?</b> Revenue at risk: anomaly magnitude × price × expected days to resolve. Alerts are ranked by it and capped per merchant per day.</li>
-        <li><b>Compute cost?</b> About 30k series. Prophet refits weekly, predicts daily. Isolation Forest and the autoencoder score in one Cloud Run job with eight parallel tasks, well under 20 minutes.</li>
+        <li><b>Three detectors rather than one.</b> Each has a blind spot. Residual models miss multivariate oddities, Isolation Forest ignores time order, autoencoders react slowly to sharp spikes. Voting trades a little recall for a lot of precision, which is what merchants need.</li>
+        <li><b>Cold start for new items.</b> Fall back to the category-level model until the item has eight weeks of history. Reconciliation already works at that level.</li>
+        <li><b>Severity.</b> Revenue at risk: anomaly magnitude × price × expected days to resolve. Alerts are ranked by it and capped per merchant per day.</li>
+        <li><b>Compute cost.</b> About 30k series at marketplace scale. The forecaster refits weekly and predicts daily; Isolation Forest and the autoencoder score in one Cloud Run job with eight parallel tasks, well under 20 minutes. In this app, 280 series score in a few seconds.</li>
       </ul>
     </div>
   </div>
@@ -478,19 +478,19 @@ tr:last-child td{border-bottom:0}
       <path class="ln" d="M930 320 H980" marker-end="url(#a4)"/>
     </svg>
     </div>
-    <figcaption>Injected anomalies give exact labels, so precision and recall are real numbers rather than estimates. The recommendation track uses the five years of real promo and price events in M5 as a natural experiment.</figcaption>
+    <figcaption>Injected anomalies give exact labels, so precision and recall are real numbers rather than estimates. The recommendation track uses the historical promotion and price events already in the data as a natural experiment.</figcaption>
   </figure>
   <div class="talk">
-    <div><h3>Say this</h3>
-      <p>"Real anomaly labels are rare, so I manufacture them. Take the last 90 days for a fifth of the stores, inject five anomaly types with known start and end, run the ensemble with production thresholds, and score it. That gives precision, recall and F1 per anomaly type, false alerts per thousand series-days, and median days to detect."</p>
-      <p>"The second track is the one that matters to a merchant. M5 has five years of real price changes and promo events. For each event, the uplift model predicts lift, I match a control series in the same category with no event, and compare realized to predicted. Sign accuracy and lift error are the metrics."</p>
-      <p>"Both reports are produced by the pipeline and attached to the model version. The gate reads them."</p>
+    <div><h3>How it works</h3>
+      <p>Real anomaly labels are rare, so the harness manufactures them. It takes the last 90 days for half of the stores, injects five anomaly types with known start and end, runs the ensemble with production thresholds, and scores the result. That gives precision, recall and F1 per anomaly type, false alerts per thousand series-days, and median days to detect.</p>
+      <p>The second track is the one that matters to a merchant. Historical price changes and promotions in the data act as a natural experiment: for each event the uplift model predicts the lift, a control series in the same category with no event is matched, and realized lift is compared with predicted. Sign accuracy and lift error are the metrics.</p>
+      <p>Both reports are produced by the pipeline and attached to the model version. The gate reads them.</p>
     </div>
-    <div><h3>If he asks</h3>
+    <div><h3>Design decisions</h3>
       <ul>
-        <li><b>Aren't injected anomalies easier than real ones?</b> Yes, so they are a floor, not a ceiling. Production precision comes from merchant feedback and is tracked separately in monitoring.</li>
-        <li><b>How do you measure recall in production?</b> Weekly stratified sample of suppressed series reviewed by hand; estimated recall with a confidence interval goes into the monitoring dashboard.</li>
-        <li><b>Why matched control and not an A/B test?</b> Historical data has no randomization. Matched control is the honest offline estimate. In production, recommendations would ship with a holdout group of merchants for a true A/B read.</li>
+        <li><b>Injected anomalies are easier than real ones.</b> So they are a floor, not a ceiling. Production precision comes from merchant feedback and is tracked separately in monitoring.</li>
+        <li><b>Recall in production.</b> A weekly stratified sample of suppressed series is reviewed by hand; estimated recall with a confidence interval goes into the monitoring dashboard.</li>
+        <li><b>Matched control rather than an A/B test.</b> Historical data has no randomization, so matched control is the honest offline estimate. In production, recommendations ship with a holdout group of merchants for a true A/B read.</li>
       </ul>
     </div>
   </div>
@@ -536,14 +536,14 @@ tr:last-child td{border-bottom:0}
     <figcaption>One hour end to end at M5 scale. Each step is idempotent on the run date, so a failed step reruns without duplicating alerts.</figcaption>
   </figure>
   <div class="talk">
-    <div><h3>Say this</h3>
-      <p>"The whole nightly run is an hour. Scheduler kicks it off, features build in BigQuery, a Cloud Run job scores everything in parallel, attribution and uplift write the alert rows, Gemini writes the notes, and Looker refreshes before anyone is at a desk."</p>
-      <p>"Every step is keyed on run date, so a retry overwrites instead of duplicating. If the Gemini step fails, merchants still get the alert with drivers and action; the note says 'narrative pending'."</p>
+    <div><h3>How it works</h3>
+      <p>The whole nightly run is an hour at marketplace scale. Cloud Scheduler starts it, features build in BigQuery, a Cloud Run job scores everything in parallel, attribution and uplift write the alert rows, Gemini writes the notes, and Looker refreshes before anyone is at a desk.</p>
+      <p>Every step is keyed on the run date, so a retry overwrites instead of duplicating. If the Gemini step fails, merchants still get the alert with drivers and action; the note says "narrative pending".</p>
     </div>
-    <div><h3>If he asks</h3>
+    <div><h3>Design decisions</h3>
       <ul>
-        <li><b>Intraday?</b> The streaming path keeps raw current. An hourly lightweight job runs only the residual detector on the top 500 revenue series for same-day spikes.</li>
-        <li><b>Cost at this scale?</b> BigQuery stays inside the free tier, Cloud Run scales to zero, Vertex pipeline runs are a few dollars each. Under $50 a month at M5 scale on the project budget alert.</li>
+        <li><b>Intraday.</b> The streaming path keeps raw current. An hourly lightweight job runs only the residual detector on the top 500 revenue series for same-day spikes.</li>
+        <li><b>Cost at this scale.</b> BigQuery stays inside the free tier, Cloud Run scales to zero, Vertex pipeline runs are a few dollars each: under $50 a month at M5 scale, with a project budget alert.</li>
       </ul>
     </div>
   </div>
@@ -552,7 +552,7 @@ tr:last-child td{border-bottom:0}
 <!-- ============ SLOs ============ -->
 <section id="slo">
   <h2>Targets and SLOs</h2>
-  <p class="sub">The numbers the gate and the monitor enforce. Say them on the call; they are what separates a demo from a system.</p>
+  <p class="sub">The numbers the gate and the monitor enforce. They are what separates a demo from a system.</p>
   <div class="tscroll">
   <table>
     <thead><tr><th>Metric</th><th>Target</th><th>Where enforced</th></tr></thead>
@@ -573,13 +573,13 @@ tr:last-child td{border-bottom:0}
 
 <!-- ============ QA ============ -->
 <section id="qa">
-  <h2>Likely questions, short answers</h2>
+  <h2>Design questions, short answers</h2>
   <div class="qa">
     <div><b>Why GCP for this?</b><p>BigQuery is the natural home for retail-scale daily sales, Dataform keeps feature SQL versioned, Vertex AI gives pipelines, registry and monitoring in one place, Cloud Run scales to zero between nightly runs, and Gemini sits inside the same IAM boundary as the data.</p></div>
-    <div><b>How does this scale from M5 to a real marketplace?</b><p>Same code. Partition by store and date, Dataflow autoscales ingestion, scoring moves from a Cloud Run job to Vertex AI batch prediction, Prophet refits move to a weekly Dataproc job. Alert caps and reconciliation are what keep output manageable, not compute.</p></div>
+    <div><b>How does this scale from M5 to a real marketplace?</b><p>Same code. Partition by store and date, Dataflow autoscales ingestion, scoring moves from a Cloud Run job to Vertex AI batch prediction, forecaster refits move to a weekly Dataproc job. Alert caps and reconciliation are what keep output manageable, not compute.</p></div>
     <div><b>What would you cut first under time pressure?</b><p>The autoencoder. Residual plus Isolation Forest with a two-of-two vote gets most of the precision. The eval harness and rollback never get cut.</p></div>
     <div><b>Where does GenAI actually add value here?</b><p>Two places only. Writing the merchant note from structured drivers so it is grounded, and Text2SQL for follow-up questions over the same tables. Detection stays classical because it has to be calibrated and cheap.</p></div>
-    <div><b>How do you handle seasonality vs. anomaly?</b><p>Prophet and SARIMAX model yearly and weekly seasonality plus holiday and SNAP regressors, so a Thanksgiving spike is expected, not anomalous. The anomaly is deviation from that expectation.</p></div>
+    <div><b>How do you handle seasonality vs. anomaly?</b><p>The residual forecaster (robust Holt-Winters in this app; Prophet or SARIMAX are drop-in options) models yearly and weekly seasonality plus holiday, SNAP and price regressors, so a Thanksgiving spike is expected, not anomalous. The anomaly is deviation from that expectation.</p></div>
     <div><b>What is the first thing you would ship?</b><p>Residual detector, eval harness, alerts table, Looker view. One week. An honest precision number on day seven beats a full ensemble on day thirty.</p></div>
   </div>
 </section>
